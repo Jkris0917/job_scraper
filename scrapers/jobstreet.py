@@ -1,22 +1,18 @@
-#scraper/jobstreet.py
-
+# scrapers/jobstreet.py
 import httpx
-from bs4 import BeautifulSoup
-from typing import List,Dict
+from typing import List, Dict
 from .base import BaseScraper
 
 HEADERS = {
-    "User-Agent" :(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
-    )
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "Accept": "application/json, text/plain, */*",
+    "Referer": "https://ph.jobstreet.com/",
 }
 
 class JobStreetScraper(BaseScraper):
-    BASE_URL = 'https://www.jobstreet.com.ph/jobs'
-    
-    def scrape(self)->List[Dict]:
+    BASE_URL = "https://ph.jobstreet.com/api/chalice-search/v4/search"
+
+    def scrape(self) -> List[Dict]:
         jobs = []
         for keyword in self.keywords:
             try:
@@ -24,47 +20,37 @@ class JobStreetScraper(BaseScraper):
             except Exception as e:
                 print(f"[JobStreet] Error scraping '{keyword}': {e}")
         return jobs
-    
-    def _scrape_keyword(self, keyword:str) -> List[Dict]:
+
+    def _scrape_keyword(self, keyword: str) -> List[Dict]:
         jobs = []
         params = {
-            "q": keyword,
-            "l": self.location,
+            "siteKey":    "PH-Main",
+            "where":      self.location,
+            "what":       keyword,
+            "pageSize":   10,
+            "page":       1,
         }
-        
-        with httpx.Client(headers=HEADERS, timeout=30) as client:
+
+        with httpx.Client(headers=HEADERS, timeout=30, follow_redirects=True) as client:
             response = client.get(self.BASE_URL, params=params)
             response.raise_for_status()
-            
-        soup = BeautifulSoup(response.text, "html.parser")
-        cards = soup.select("article[data-automation='normaljob']")
-        
-        for card in cards:
+            data = response.json()
+
+        for job in data.get("data", []):
             try:
-                title_el = card.select_one("a[data-automation='jobTitle']")
-                company_el = card.select_one("a[data-automation='jobCompany']")
-                location_el = card.select_one("a[data-automation='jobLocation']")
-                
-                title = title_el.get_text(strip=True) if title_el else "N/A"
-                company = company_el.get_text(strip=True) if company_el else "N/A"
-                location = location_el.get_text(strip=True) if location_el else "N/A"
-                url = "https://www.jobstreet.com.ph" + title_el["href"] if title_el else None
-                
-                if not url:
-                    continue
-                
                 jobs.append({
-                    "title": title,
-                    "company": company,
-                    "location" : location,
-                    "url": url,
-                    "source": "JobStreet",
-                    "keywords" : keyword,
-                    "description" : None,
-                    "posted_at" : None,
+                    "title":       job.get("title", "N/A"),
+                    "company":     job.get("advertiser", {}).get("description", "N/A"),
+                    "location":    job.get("location", self.location),
+                    "url":         "https://ph.jobstreet.com/job/" + str(job.get("id")),
+                    "source":      "JobStreet",
+                    "keyword":     keyword,
+                    "description": job.get("teaser", None),
+                    "posted_at":   None,
                 })
-            except Exception as e :
-                print(f"[JobStreet] Error parsing card: {e}")
+            except Exception as e:
+                print(f"[JobStreet] Error parsing job: {e}")
                 continue
+
         print(f"[JobStreet] Found {len(jobs)} jobs for '{keyword}'")
         return jobs

@@ -5,7 +5,7 @@ from typing import List,Dict
 from .base import BaseScraper
 
 class KalibrrScraper(BaseScraper):
-    BASE_URL = "https://www.kalibrr.com/api/jobs_board/jobs"
+    BASE_URL = "https://www.kalibrr.com/kjs/job_board/jobs"
     
     def scrape(self) -> List[Dict]:
         jobs = []
@@ -21,7 +21,7 @@ class KalibrrScraper(BaseScraper):
         params = {
             "limit": 10,
             "offset" : 0,
-            "keyword" : keyword,
+            "q" : keyword,
             "location" : self.location
         }
         

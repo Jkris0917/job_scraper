@@ -1,50 +1,65 @@
 # scraper.py
 from dotenv import load_dotenv
 import os
-from scrapers import jobstreet,kalibrr
+from scrapers.jobstreet import JobStreetScraper
+from scrapers.kalibrr import KalibrrScraper
 from database import SessionLocal
 from models import JobListing
-# TODO: import your two scrapers from scrapers/
-# TODO: import SessionLocal from database.py
-# TODO: import JobListing from models.py
 
 load_dotenv()
 
 def get_keywords():
-    # TODO: read KEYWORDS from .env
-    # hint: os.getenv("KEYWORDS", "")
-    # hint: split by comma → return a list
+    raw = os.getenv("KEYWORDS", "")
+    keywords = [k.strip() for k in raw.split(",") if k.strip()]
+    if not keywords:
+        print("Warning: No keywords provided. Check your .env file.")
+    return keywords
     
-    keywords = os.getenv("KEYWORDS", "")
-    
-
 def get_location():
-    # TODO: read LOCATION from .env
-    location = os.getenv("LOCATION","")
-    
+    location = os.getenv("LOCATION", "").strip()
+    return location
+        
 def save_jobs(jobs: list):
-    # TODO: open a DB session
-    # TODO: loop through jobs
-    # TODO: check if url already exists in DB (avoid duplicates)
-    # hint: session.query(JobListing).filter_by(url=job["url"]).first()
-    # TODO: if not exists → create JobListing object and add to session
-    # TODO: commit and close session
-    # TODO: return count of NEW jobs saved
+
     session = SessionLocal()
+    new_jobs_count = 0
+    try:
+        for job in jobs:
+            existing_job = session.query(JobListing).filter_by(url=job["url"]).first()
+            keywords_value = job.get("keywords") or job.get("keyword")
+            if not existing_job:
+                new_job = JobListing(
+                    title=job["title"],
+                    company=job["company"],
+                    location=job["location"],
+                    url=job["url"],
+                    source=job["source"],
+                    keywords=keywords_value,
+                    description=job.get("description"),
+                    posted_at=job.get("posted_at"),
+                )
+                session.add(new_job)
+                new_jobs_count += 1
+        session.commit()
+    finally:
+        session.close()
+    return new_jobs_count
 
 def run_scraper():
     keywords = get_keywords()
     location = get_location()
     all_jobs = []
 
-    # TODO: create JobStreetScraper and call .scrape() → extend all_jobs
-    # TODO: create KalibrrScraper and call .scrape() → extend all_jobs
+    jobstreet_scraper = JobStreetScraper(keywords, location)
+    all_jobs.extend(jobstreet_scraper.scrape())
+
+    kalibrr_scraper = KalibrrScraper(keywords, location)
+    all_jobs.extend(kalibrr_scraper.scrape())
 
     print(f"Total jobs found: {len(all_jobs)}")
 
-    # TODO: call save_jobs(all_jobs)
-    # TODO: print how many new jobs were saved
-    pass
+    new_jobs_count = save_jobs(all_jobs)
+    print(f"New jobs saved: {new_jobs_count}")
 
 if __name__ == "__main__":
     run_scraper()
