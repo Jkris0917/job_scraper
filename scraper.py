@@ -1,8 +1,8 @@
 # scraper.py
 from dotenv import load_dotenv
 import os
-from scrapers.jobstreet import JobStreetScraper
-from scrapers.kalibrr import KalibrrScraper
+from scrapers.indeed import IndeedScaper
+from scrapers.google import KalibrrScraper
 from database import SessionLocal
 from models import JobListing
 
@@ -50,8 +50,8 @@ def run_scraper():
     location = get_location()
     all_jobs = []
 
-    jobstreet_scraper = JobStreetScraper(keywords, location)
-    all_jobs.extend(jobstreet_scraper.scrape())
+    indeed_scraper = IndeedScaper(keywords, location)
+    all_jobs.extend(indeed_scraper.scrape())
 
     kalibrr_scraper = KalibrrScraper(keywords, location)
     all_jobs.extend(kalibrr_scraper.scrape())
