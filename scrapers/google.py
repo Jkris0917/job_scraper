@@ -1,50 +1,43 @@
-# scrapers/kalibrr.py
+#scraper/google.py
 
-import httpx
-from typing import List,Dict
+from jobspy import scrape_jobs
+from typing import List, Dict
 from .base import BaseScraper
 
-class KalibrrScraper(BaseScraper):
-    BASE_URL = "https://www.kalibrr.com/kjs/job_board/jobs"
-    
+class GoogleScraper(BaseScraper):
     def scrape(self) -> List[Dict]:
         jobs = []
+        
         for keyword in self.keywords:
             try:
-                jobs.extend(self._scraper_keyword(keyword))
+                jobs.extend(self._scrape_keyword(keyword))
             except Exception as e:
-                print(f"[Kalibrr] Error scraping '{keyword}': {e}")
+                print(f"[Google] Error scraping '{keyword}' : {e}")
         return jobs
     
-    def _scraper_keyword(self,keyword=str) -> List[Dict]:
+    def _scrape_keyword(self, keyword:str) -> List[Dict]:
         jobs = []
-        params = {
-            "limit": 10,
-            "offset" : 0,
-            "q" : keyword,
-            "location" : self.location
-        }
+        scraped_jobs = scrape_jobs(
+            site_name=["google"],
+            location=self.location,
+            search_term=keyword,
+            results_wanted=10,
+        )
         
-        with httpx.Client(timeout=30) as client:
-            response = client.get(self.BASE_URL, params=params)
-            response.raise_for_status()
-            data = response.json()
-            
-        for job in data.get("jobs",[]):
+        for index,row in scraped_jobs.iterrows():
             try:
                 jobs.append({
-                    "title" : job.get("name","N/A"),
-                    "company" : job.get("company", {}).get("name", "N/A"),
-                    "location": job.get("location", [{}])[0].get("name", self.location),
-                    "url":         f"https://www.kalibrr.com/c/{job.get('company', {}).get('slug')}/jobs/{job.get('id')}",
-                    "source":      "Kalibrr",
-                    "keyword":     keyword,
-                    "description": job.get("description", None),
-                    "posted_at":   None,
+                    "title": row["title"],
+                    "company" : row["company"],
+                    "location" : row["location"],
+                    "url" : row["job_url"],
+                    "source": "Google",
+                    "keyword": keyword,
+                    "description": row.get("description"),
+                    "posted_at": row.get("date_posted"),
                 })
             except Exception as e:
-                print(f"[Kalibrr] Error parsing job: {e}")
+                print(f"[Google] Error processing job data: {e}")
                 continue
-        print(f"[Kalibrr] Found {len(jobs)} jobs for '{keyword}'")
+        print(f"[Google] Scraped {len(jobs)} jobs for keyword '{keyword}'")
         return jobs
-        

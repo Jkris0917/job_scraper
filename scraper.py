@@ -1,11 +1,11 @@
 # scraper.py
 from dotenv import load_dotenv
 import os
-from scrapers.indeed import IndeedScaper
-from scrapers.google import KalibrrScraper
+from scrapers.indeed import IndeedScraper
+from scrapers.google import GoogleScraper
 from database import SessionLocal
 from models import JobListing
-
+from notifier import run_notify
 load_dotenv()
 
 def get_keywords():
@@ -22,7 +22,7 @@ def get_location():
 def save_jobs(jobs: list):
 
     session = SessionLocal()
-    new_jobs_count = 0
+    new_jobs = []
     try:
         for job in jobs:
             existing_job = session.query(JobListing).filter_by(url=job["url"]).first()
@@ -34,32 +34,35 @@ def save_jobs(jobs: list):
                     location=job["location"],
                     url=job["url"],
                     source=job["source"],
-                    keywords=keywords_value,
+                    keyword=keywords_value,
                     description=job.get("description"),
                     posted_at=job.get("posted_at"),
                 )
                 session.add(new_job)
-                new_jobs_count += 1
+                new_jobs.append(job)
         session.commit()
     finally:
         session.close()
-    return new_jobs_count
+    return new_jobs
 
 def run_scraper():
     keywords = get_keywords()
     location = get_location()
     all_jobs = []
 
-    indeed_scraper = IndeedScaper(keywords, location)
+    indeed_scraper = IndeedScraper(keywords, location)
     all_jobs.extend(indeed_scraper.scrape())
 
-    kalibrr_scraper = KalibrrScraper(keywords, location)
-    all_jobs.extend(kalibrr_scraper.scrape())
+    google_scraper = GoogleScraper(keywords, location)
+    all_jobs.extend(google_scraper.scrape())
 
     print(f"Total jobs found: {len(all_jobs)}")
 
-    new_jobs_count = save_jobs(all_jobs)
-    print(f"New jobs saved: {new_jobs_count}")
+    new_jobs = save_jobs(all_jobs)
+    print(f"New jobs saved: {len(new_jobs)}")
+    
+    if new_jobs:
+        run_notify(new_jobs)
 
 if __name__ == "__main__":
     run_scraper()

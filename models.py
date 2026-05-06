@@ -15,7 +15,7 @@ class JobListing(Base):
     location = Column(String(255))
     url = Column(String(255), unique=True, nullable=False)
     source = Column(String(255))
-    keywords = Column(String(255))
+    keyword = Column(String(255))
     description = Column(Text)
     posted_at = Column(DateTime)
     scraped_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
